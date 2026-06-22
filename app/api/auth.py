@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from app.core.database import get_db
 from app.core.security import get_password_hash, verify_password, create_access_token, get_current_user
-from app.models.schema import User, FileHistory
+from app.models.schema import User, FileHistory, Subscription
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -39,21 +39,50 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            detail="Wrong credential",
             headers={"WWW-Authenticate": "Bearer"},
         )
         
     access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
+import datetime
+
 @router.get("/me")
 def get_me(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     total_processed = db.query(func.count(FileHistory.id)).filter(FileHistory.user_id == current_user.id).scalar()
     
+    now = datetime.datetime.now(datetime.timezone.utc)
+    
+    latest_sub = db.query(Subscription).filter(Subscription.user_id == current_user.id).order_by(Subscription.end_date.desc()).first()
+    
+    premium_status = "basic"
+    sub_start = None
+    sub_end = None
+    
+    if latest_sub:
+        end_date = latest_sub.end_date
+        if end_date.tzinfo is None:
+            end_date = end_date.replace(tzinfo=datetime.timezone.utc)
+            
+        sub_start = latest_sub.start_date
+        sub_end = latest_sub.end_date
+            
+        if end_date > now:
+            premium_status = "premium"
+        else:
+            premium_status = "expired"
+            
+    if current_user.membership_status != premium_status:
+        current_user.membership_status = premium_status
+        db.commit()
+            
     return {
         "id": current_user.id,
         "username": current_user.username,
         "email": current_user.email,
-        "is_premium": current_user.is_premium,
+        "membership_status": premium_status,
+        "subscription_start_date": sub_start,
+        "subscription_end_date": sub_end,
         "total_files_processed": total_processed or 0
     }

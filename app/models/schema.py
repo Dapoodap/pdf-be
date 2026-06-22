@@ -10,10 +10,11 @@ class User(Base):
     username = Column(String, unique=True, index=True)
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
-    is_premium = Column(Boolean, default=False)
+    membership_status = Column(String, default="basic")
 
     transactions = relationship("Transaction", back_populates="user")
     file_histories = relationship("FileHistory", back_populates="user")
+    subscriptions = relationship("Subscription", back_populates="user")
 
 class Service(Base):
     __tablename__ = "services"
@@ -22,17 +23,16 @@ class Service(Base):
     name = Column(String, unique=True, index=True)
     description = Column(String)
 
-    pricings = relationship("Pricing", back_populates="service")
     file_histories = relationship("FileHistory", back_populates="service")
 
 class Pricing(Base):
     __tablename__ = "pricings"
 
     id = Column(Integer, primary_key=True, index=True)
-    service_id = Column(Integer, ForeignKey("services.id", ondelete="CASCADE"))
     price = Column(Float, default=0.0)
-
-    service = relationship("Service", back_populates="pricings")
+    description = Column(String)
+    plan_type = Column(String)
+    duration_days = Column(Integer)
 
 class Transaction(Base):
     __tablename__ = "transactions"
@@ -41,9 +41,27 @@ class Transaction(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
     amount = Column(Float)
     status = Column(String)
+    
+    order_id = Column(String, unique=True, index=True, nullable=True)
+    midtrans_transaction_id = Column(String, nullable=True)
+    payment_type = Column(String, nullable=True)
+    snap_token = Column(String, nullable=True)
+    snap_redirect_url = Column(String, nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", back_populates="transactions")
+
+class Subscription(Base):
+    __tablename__ = "subscriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+    pricing_id = Column(Integer, ForeignKey("pricings.id", ondelete="SET NULL"), nullable=True)
+    start_date = Column(DateTime(timezone=True))
+    end_date = Column(DateTime(timezone=True))
+
+    user = relationship("User", back_populates="subscriptions")
 
 class FileHistory(Base):
     __tablename__ = "file_histories"
