@@ -113,16 +113,21 @@ def x_to_pdf(file_content: bytes, file_ext: str) -> bytes:
     temp_dir = tempfile.gettempdir()
     
     try:
-        process = subprocess.run([
-            "libreoffice",
-            "--headless",
-            "--convert-to",
-            "pdf",
-            temp_input_path,
-            "--outdir",
-            temp_dir
-        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        
+        process = subprocess.run(
+            [
+                "libreoffice",
+                "--headless",
+                "--convert-to",
+                "pdf",
+                temp_input_path,
+                "--outdir",
+                temp_dir,
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=120,  # Kill process jika lebih dari 2 menit (mencegah zombie process)
+        )
+
         if process.returncode != 0:
             raise RuntimeError(f"LibreOffice conversion failed: {process.stderr.decode()}")
             
@@ -137,6 +142,8 @@ def x_to_pdf(file_content: bytes, file_ext: str) -> bytes:
             
         os.remove(output_pdf_path)
         return pdf_bytes
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("LibreOffice conversion timed out after 120 seconds. Please try a smaller file.")
     finally:
         if os.path.exists(temp_input_path):
             os.remove(temp_input_path)

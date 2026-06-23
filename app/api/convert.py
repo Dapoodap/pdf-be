@@ -19,11 +19,16 @@ def process_and_upload(db: Session, user_id: int | None, file_bytes: bytes, serv
     file_id = str(uuid.uuid4())
     filename = f"{base_name}-{service_name}-{file_id}{ext}"
     gcs_path = storage.upload_file_to_gcs(file_bytes, service_name, filename)
-    history = log_file_history(db, user_id, service_name, gcs_path, filename, ext_arg)
+    
+    history_id = None
+    if user_id is not None:
+        history = log_file_history(db, user_id, service_name, gcs_path, filename, ext_arg)
+        history_id = history.id
+        
     download_url = storage.generate_presigned_url(gcs_path)
     return {
         "message": "Success", 
-        "history_id": history.id, 
+        "history_id": history_id, 
         "file_path": gcs_path, 
         "file_name": filename,
         "download_url": download_url

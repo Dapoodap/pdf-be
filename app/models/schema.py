@@ -38,7 +38,7 @@ class Transaction(Base):
     __tablename__ = "transactions"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), index=True)
     amount = Column(Float)
     status = Column(String)
     
@@ -56,7 +56,7 @@ class Subscription(Base):
     __tablename__ = "subscriptions"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True)
     pricing_id = Column(Integer, ForeignKey("pricings.id", ondelete="SET NULL"), nullable=True)
     start_date = Column(DateTime(timezone=True))
     end_date = Column(DateTime(timezone=True))
@@ -67,7 +67,7 @@ class FileHistory(Base):
     __tablename__ = "file_histories"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     service_id = Column(Integer, ForeignKey("services.id", ondelete="SET NULL"), nullable=True)
     file_path = Column(String)
     file_name = Column(String)
