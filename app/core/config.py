@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "default_secret_key_change_me_in_production"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080  # 7 days
     MIDTRANS_SERVER_KEY: str = ""
+    GOOGLE_CLIENT_ID: str = ""
     # Comma-separated list of allowed CORS origins. Set to "*" only in development.
     ALLOWED_ORIGINS: str = "*"
 

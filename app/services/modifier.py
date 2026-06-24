@@ -60,3 +60,40 @@ def lock_pdf(file_content: bytes, password: str) -> bytes:
     output = io.BytesIO()
     writer.write(output)
     return output.getvalue()
+
+def sign_pdf(file_content: bytes, signature_content: bytes, page_number: int, x: float, y: float, width: float, height: float) -> bytes:
+    import fitz  # PyMuPDF
+
+    # Open the PDF document from bytes
+    doc = fitz.open(stream=file_content, filetype="pdf")
+    
+    # Ensure the requested page exists
+    if page_number < 0 or page_number >= len(doc):
+        raise ValueError(f"Invalid page number. Document has {len(doc)} pages.")
+        
+    page = doc.load_page(page_number)
+    
+    # Jika nilainya berupa pecahan (<= 1.0), berarti FE mengirim dalam bentuk persentase
+    if width <= 1.0 and height <= 1.0 and x <= 1.0 and y <= 1.0:
+        actual_x = x * page.rect.width
+        actual_y = y * page.rect.height
+        actual_width = width * page.rect.width
+        actual_height = height * page.rect.height
+    else:
+        actual_x = x
+        actual_y = y
+        actual_width = width
+        actual_height = height
+    
+    # Define the rectangle where the signature will be placed
+    rect = fitz.Rect(actual_x, actual_y, actual_x + actual_width, actual_y + actual_height)
+    
+    # Insert the signature image
+    page.insert_image(rect, stream=signature_content)
+    
+    # Save the modified document to a byte stream
+    output = io.BytesIO()
+    doc.save(output)
+    doc.close()
+    
+    return output.getvalue()

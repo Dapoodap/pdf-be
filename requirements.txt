@@ -17,3 +17,7 @@ passlib
 bcrypt==3.2.2
 python-jose[cryptography]
 httpx
+pymupdf
+PyMuPDF
+google-auth
+requests

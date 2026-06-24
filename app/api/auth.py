@@ -3,6 +3,10 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from pydantic import BaseModel
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
+import random
+import string
 
 from app.core.database import get_db
 from app.core.security import get_password_hash, verify_password, create_access_token, get_current_user
@@ -45,6 +49,61 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         
     access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+class GoogleAuthRequest(BaseModel):
+    token: str
+
+@router.post("/google")
+def google_auth(request: GoogleAuthRequest, db: Session = Depends(get_db)):
+    from google.oauth2 import id_token
+    from google.auth.transport import requests as google_requests
+    from app.core.config import settings
+    import secrets
+
+    try:
+        # Verify the Google token
+        idinfo = id_token.verify_oauth2_token(
+            request.token, 
+            google_requests.Request(), 
+            settings.GOOGLE_CLIENT_ID
+        )
+        
+        email = idinfo.get("email")
+        name = idinfo.get("name") or idinfo.get("given_name") or email.split('@')[0]
+        
+        if not email:
+            raise HTTPException(status_code=400, detail="Google token does not contain email")
+            
+        # Check if user exists
+        user = db.query(User).filter(User.email == email).first()
+        
+        if not user:
+            # Check if username is taken, append random string if needed
+            existing_username = db.query(User).filter(User.username == name).first()
+            if existing_username:
+                name = f"{name}_{secrets.token_hex(2)}"
+                
+            # Create a new user with a random unguessable password
+            random_password = secrets.token_urlsafe(16)
+            hashed_password = get_password_hash(random_password)
+            
+            user = User(
+                username=name,
+                email=email,
+                hashed_password=hashed_password
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            
+        # Generate our local JWT access token
+        access_token = create_access_token(data={"sub": user.username})
+        return {"access_token": access_token, "token_type": "bearer"}
+        
+    except ValueError as e:
+        # Invalid token
+        raise HTTPException(status_code=401, detail=f"Invalid Google token: {str(e)}")
 
 import datetime
 

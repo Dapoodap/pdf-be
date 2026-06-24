@@ -159,3 +159,57 @@ async def lock_pdf(
 
     user_id = current_user.id if current_user else None
     return process_and_upload(db, user_id, locked_bytes, "lock", f"locked_{file.filename}")
+
+
+@router.post("/sign")
+async def sign_pdf(
+    file: UploadFile = File(...),
+    signature: UploadFile = File(...),
+    signature_details: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user)
+):
+    check_file_limits(current_user, [file])
+
+    content = await file.read()
+    validate_file_type(content, expected="pdf", filename=file.filename)
+    
+    sig_content = await signature.read()
+    
+    # Check signature file type (allow png and jpeg)
+    ext = os.path.splitext(signature.filename)[1].lower()
+    if ext == ".png":
+        validate_file_type(sig_content, expected="png", filename=signature.filename)
+    elif ext in [".jpg", ".jpeg"]:
+        validate_file_type(sig_content, expected="jpeg", filename=signature.filename)
+    else:
+        raise HTTPException(status_code=400, detail="Signature must be a PNG or JPEG image.")
+
+    try:
+        details = json.loads(signature_details)
+        page = details.get("page")
+        x = details.get("x")
+        y = details.get("y")
+        width = details.get("width")
+        height = details.get("height")
+        
+        if any(v is None for v in [page, x, y, width, height]):
+            raise ValueError("Missing required fields in signature_details (page, x, y, width, height).")
+            
+        page = int(page)
+        x = float(x)
+        y = float(y)
+        width = float(width)
+        height = float(height)
+    except Exception as e:
+        logger.error(f"sign config error: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail="signature_details must be a valid JSON with page, x, y, width, and height.")
+
+    try:
+        signed_bytes = modifier.sign_pdf(content, sig_content, page, x, y, width, height)
+    except Exception as e:
+        logger.error(f"sign error: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail=str(e))
+
+    user_id = current_user.id if current_user else None
+    return process_and_upload(db, user_id, signed_bytes, "sign", f"signed_{file.filename}")
